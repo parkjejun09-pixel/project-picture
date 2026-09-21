@@ -1,0 +1,9 @@
+.build/
+dist/
+.DS_Store
+*.log
+
+.worktrees/
+
+node_modules/
+test-results/
