@@ -33,6 +33,8 @@ import {
   workspacePreferencesFromState
 } from './editor/workspacePreferences.js';
 import type { EditorAction, EditorState, Tool } from './editor/types.js';
+import { EditorCommandRegistry, type EditorCommandId } from './editor/commands.js';
+import { TOOL_SHORTCUTS, shortcutForTool } from './editor/shortcuts.js';
 import { createProjectSnapshot, ProjectDirtyTracker } from './persistence/projectModel.js';
 import { decodeProjectFile, encodeProjectFile } from './persistence/projectFormat.js';
 import { deserializeEditorState } from './persistence/editorStateDto.js';
@@ -77,6 +79,7 @@ export class EditorApp {
   private projectTitle = 'Untitled';
   private projectCreatedAt = new Date().toISOString();
   private projectExtensions: Record<string, unknown> = {};
+  private readonly commands = new EditorCommandRegistry();
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -84,26 +87,18 @@ export class EditorApp {
 
   mount(): void {
     this.loadWorkspacePreferences();
+    this.registerCommands();
     this.shell = document.createElement('div');
     this.shell.className = 'editor-shell';
 
     this.topBar = createTopBar({
-      onUndo: () => this.drawingCanvas?.undo(),
-      onRedo: () => this.drawingCanvas?.redo(),
-      onExport: () => this.drawingCanvas?.exportPng(),
-      onResetView: () => this.dispatch({ type: 'view/reset' }),
+      onCommand: (command) => this.commands.execute(command),
       onModeChange: (mode) => this.dispatch({ type: 'mode/set', mode }),
       onToggleHandedness: () => this.dispatch({ type: 'handedness/set', value: this.state.handedness === 'right' ? 'left' : 'right' })
     });
 
     this.commandBar = createCommandBar(this.state, {
-      onOpenProject: () => { void this.openProjectFile(); },
-      onSaveProject: () => { void this.saveProjectFile(false); },
-      onSaveAsProject: () => { void this.saveProjectFile(true); },
-      onUndo: () => this.drawingCanvas?.undo(),
-      onRedo: () => this.drawingCanvas?.redo(),
-      onExport: () => this.drawingCanvas?.exportPng(),
-      onResetView: () => this.dispatch({ type: 'view/reset' }),
+      onCommand: (command) => this.commands.execute(command),
       onSize: (value) => this.dispatch({ type: 'brush-size/set', value }),
       onOpacity: (value) => this.dispatch({ type: 'opacity/set', value }),
       onStabilizer: (value) => this.dispatch({ type: 'stabilizer/set', value }),
@@ -245,7 +240,8 @@ export class EditorApp {
     });
 
     this.colorPanel = new ColorPanel(this.state, {
-      onColorChange: (value) => this.dispatch({ type: 'color/set', value }),
+      onColorPreview: (value) => this.dispatch({ type: 'color/preview', value }),
+      onColorCommit: (value) => this.dispatch({ type: 'color/commit', value }),
       onToggleFavorite: (value) => this.dispatch({ type: 'favorite-color/toggle', value }),
       onAddProject: (value) => this.dispatch({ type: 'project-color/add', value }),
       onExtractedColors: (values) => this.dispatch({ type: 'extracted-colors/set', values })
@@ -543,15 +539,30 @@ export class EditorApp {
       const command = event.ctrlKey || event.metaKey;
       if (command && event.key.toLowerCase() === 'z') {
         event.preventDefault();
-        if (event.shiftKey) this.drawingCanvas.redo();
-        else this.drawingCanvas.undo();
+        this.commands.execute(event.shiftKey ? 'edit.redo' : 'edit.undo');
         return;
       }
-      const toolByKey: Record<string, Tool | undefined> = { b: 'brush', e: 'eraser', s: 'smudge', x: 'mix', h: 'pan', g: 'fill', i: 'eyedropper', d: 'gradient', u: 'shape', m: 'select', w: 'magic-wand', l: 'lasso', t: 'transform', v: 'vector', a: 'text', r: 'assist' };
-      const tool = toolByKey[event.key.toLowerCase()];
+      const tool = TOOL_SHORTCUTS[this.state.shortcutProfile][event.key.toLowerCase()];
       if (tool) { this.dispatch({ type: 'tool/set', tool }); return; }
-      if (event.key === '0') this.dispatch({ type: 'view/reset' });
+      if (event.key === '0') this.commands.execute('view.fitCanvas');
     });
+  }
+
+  private registerCommands(): void {
+    const register = (id: EditorCommandId, run: () => void | Promise<void>): void => this.commands.register(id, { run });
+    register('file.open', () => this.openProjectFile());
+    register('file.save', () => this.saveProjectFile(false));
+    register('file.saveAs', () => this.saveProjectFile(true));
+    register('file.exportPng', () => this.drawingCanvas?.exportPng());
+    register('edit.undo', () => this.drawingCanvas?.undo());
+    register('edit.redo', () => this.drawingCanvas?.redo());
+    register('layer.addRaster', () => this.drawingCanvas?.addLayer());
+    register('select.all', () => this.drawingCanvas?.selectAll());
+    register('select.clear', () => this.drawingCanvas?.clearSelection());
+    register('view.fitCanvas', () => this.dispatch({ type: 'view/reset' }));
+    register('view.actualSize', () => { this.dispatch({ type: 'zoom/set', value: 1 }); this.dispatch({ type: 'pan/set', x: 0, y: 0 }); });
+    register('window.resetWorkspace', () => this.dispatch({ type: 'workspace/reset' }));
+    register('help.about', () => window.alert('Drawing Studio V0.6.7.1 — interaction stability release'));
   }
 
   private syncUI(): void {
@@ -566,6 +577,7 @@ export class EditorApp {
     this.shell.style.setProperty('--secondary-color', this.state.secondaryColor);
 
     this.shell.querySelectorAll<HTMLElement>('[data-tool]').forEach((node) => node.classList.toggle('active', node.dataset.tool === this.state.tool));
+    this.shell.querySelectorAll<HTMLElement>('.toolbar [data-tool]').forEach((node) => { const tool=node.dataset.tool as Tool; const key=shortcutForTool(tool,this.state.shortcutProfile); const label=node.querySelector('span:last-child')?.textContent ?? tool; node.title=key?`${label} (${key})`:label; });
     this.shell.querySelectorAll<HTMLElement>('[data-preset]').forEach((node) => node.classList.toggle('selected', node.dataset.preset === this.state.brushPreset));
     const mode = this.shell.querySelector<HTMLSelectElement>('[data-control="mode"]');
     if (mode) mode.value = this.state.mode;
