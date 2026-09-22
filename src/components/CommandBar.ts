@@ -1,3 +1,5 @@
+import type { EditorCommandId } from '../editor/commands.js';
+
 export interface CommandBarState {
   brushSize: number;
   opacity: number;
@@ -77,4 +79,3 @@ export function updateCommandBar(bar: HTMLElement, state: CommandBarState): void
   const snap = bar.querySelector<HTMLButtonElement>('[data-action="snap-toggle"]');
   if (snap) { snap.classList.toggle('is-on', state.assistSnapEnabled); snap.setAttribute('aria-pressed', String(state.assistSnapEnabled)); }
 }
-import type { EditorCommandId } from '../editor/commands.js';

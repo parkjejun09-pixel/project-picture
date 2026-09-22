@@ -19,21 +19,25 @@ export function createBrushPanel(state: EditorState, callbacks: BrushPanelCallba
   section.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((button) => {
     button.addEventListener('click', () => callbacks.onPreset(button.dataset.preset as BrushPresetId));
   });
-  section.querySelector<HTMLInputElement>('[data-brush-search]')?.addEventListener('input', (event) => {
-    const query = (event.currentTarget as HTMLInputElement).value.trim().toLowerCase();
-    section.querySelectorAll<HTMLElement>('[data-preset]').forEach((button) => { button.hidden = Boolean(query) && !button.textContent?.toLowerCase().includes(query); });
-  });
   const favoriteKey='drawing-studio-brush-favorites';
   const recentKey='drawing-studio-brush-recent';
   let favorites:string[]=[]; try { favorites=JSON.parse(localStorage.getItem(favoriteKey) ?? '[]'); } catch {}
   let recent:string[]=[]; try { recent=JSON.parse(localStorage.getItem(recentKey) ?? '[]'); } catch {}
   let filter: 'all'|'favorites'|'recent' = 'all';
+  let query = '';
   const applyFilter=():void=>{
     let visible=0;
-    section.querySelectorAll<HTMLElement>('[data-preset]').forEach((button)=>{ const id=button.dataset.preset ?? ''; const show=filter==='all'||(filter==='favorites'?favorites:recent).includes(id); button.hidden=!show; if(show)visible++; });
+    section.querySelectorAll<HTMLElement>('[data-preset]').forEach((button)=>{
+      const id=button.dataset.preset ?? '';
+      const matchesFilter=filter==='all'||(filter==='favorites'?favorites:recent).includes(id);
+      const matchesSearch=!query||Boolean(button.textContent?.toLowerCase().includes(query));
+      const show=matchesFilter&&matchesSearch;
+      button.hidden=!show; if(show)visible++;
+    });
     section.querySelector<HTMLElement>('[data-brush-count]')!.textContent=`${visible} brush${visible===1?'':'es'}`;
     section.querySelectorAll<HTMLElement>('[data-brush-filter]').forEach((button)=>button.classList.toggle('active',button.dataset.brushFilter===filter));
   };
+  section.querySelector<HTMLInputElement>('[data-brush-search]')?.addEventListener('input', (event) => { query=(event.currentTarget as HTMLInputElement).value.trim().toLowerCase(); applyFilter(); });
   const syncFavorites=()=>section.querySelectorAll<HTMLElement>('[data-brush-favorite]').forEach((star)=>{ star.textContent=favorites.includes(star.dataset.brushFavorite ?? '')?'★':'☆'; });
   section.querySelectorAll<HTMLElement>('[data-brush-favorite]').forEach((star)=>star.addEventListener('click',(event)=>{ event.stopPropagation(); const id=star.dataset.brushFavorite ?? ''; favorites=favorites.includes(id)?favorites.filter(v=>v!==id):[...favorites,id]; try{localStorage.setItem(favoriteKey,JSON.stringify(favorites));}catch{} syncFavorites(); applyFilter(); }));
   syncFavorites();

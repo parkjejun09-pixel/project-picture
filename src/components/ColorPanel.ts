@@ -193,11 +193,13 @@ export class ColorPanel {
   private bindPointerControl(selector: string, callback: (event: PointerEvent, element: HTMLElement) => string): void {
     const element = this.element.querySelector<HTMLElement>(selector)!;
     let preview = this.state.color;
+    let startColor = this.state.color;
+    let activePointer: number | null = null;
     const handle = (event: PointerEvent): void => { event.preventDefault(); event.stopPropagation(); preview = callback(event, element); this.callbacks.onColorPreview(preview); };
-    element.addEventListener('pointerdown', (event) => { element.setPointerCapture?.(event.pointerId); handle(event); });
-    element.addEventListener('pointermove', (event) => { if (element.hasPointerCapture?.(event.pointerId)) handle(event); });
-    element.addEventListener('pointerup', (event) => { handle(event); element.releasePointerCapture?.(event.pointerId); this.callbacks.onColorCommit(preview); });
-    element.addEventListener('pointercancel', (event) => element.releasePointerCapture?.(event.pointerId));
+    element.addEventListener('pointerdown', (event) => { startColor=this.state.color; activePointer=event.pointerId; element.setPointerCapture?.(event.pointerId); handle(event); });
+    element.addEventListener('pointermove', (event) => { if (activePointer===event.pointerId && element.hasPointerCapture?.(event.pointerId)) handle(event); });
+    element.addEventListener('pointerup', (event) => { if(activePointer!==event.pointerId)return; handle(event); element.releasePointerCapture?.(event.pointerId); activePointer=null; this.callbacks.onColorCommit(preview); });
+    element.addEventListener('pointercancel', (event) => { if(activePointer!==event.pointerId)return; element.releasePointerCapture?.(event.pointerId); activePointer=null; preview=startColor; this.callbacks.onColorPreview(startColor); });
   }
 
   private renderHarmony(): void {

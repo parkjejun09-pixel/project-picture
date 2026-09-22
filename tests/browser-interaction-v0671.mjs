@@ -16,6 +16,22 @@ try {
   const layers = await page.locator('.layer-row').count();
   await page.locator('[data-command="layer.addRaster"]').click();
   assert.equal(await page.locator('.layer-row').count(), layers + 1);
+  await page.locator('[data-menu="edit"]').click(); await page.locator('[data-command="edit.undo"]').click();
+  assert.equal(await page.locator('.layer-row').count(), layers, 'Edit > Undo changes document history');
+  await page.locator('[data-menu="edit"]').click(); await page.locator('[data-command="edit.redo"]').click();
+  assert.equal(await page.locator('.layer-row').count(), layers + 1, 'Edit > Redo changes document history');
+
+  await page.locator('[data-menu="select"]').click(); await page.locator('[data-command="select.all"]').click();
+  assert.ok(await page.evaluate(() => window.testApp.drawingCanvas.selectionInfo.rect), 'Select > Select all creates a selection');
+  await page.locator('[data-menu="select"]').click(); await page.locator('[data-command="select.clear"]').click();
+  assert.equal(await page.evaluate(() => window.testApp.drawingCanvas.selectionInfo.rect), null, 'Select > Clear selection clears it');
+
+  await page.evaluate(() => window.testApp.dispatch({type:'zoom/set',value:2}));
+  await page.locator('[data-menu="view"]').click(); await page.locator('[data-command="view.fitCanvas"]').click();
+  assert.equal(await page.evaluate(() => window.testApp.state.zoom), 1, 'View > Fit canvas resets zoom');
+  await page.evaluate(() => { window.testApp.dispatch({type:'zoom/set',value:2}); window.testApp.dispatch({type:'pan/set',x:20,y:30}); });
+  await page.locator('[data-menu="view"]').click(); await page.locator('[data-command="view.actualSize"]').click();
+  assert.deepEqual(await page.evaluate(() => ({zoom:window.testApp.state.zoom,pan:window.testApp.state.pan})), {zoom:1,pan:{x:0,y:0}}, 'View > Actual size resets zoom and pan');
 
   const wheel = page.locator('[data-control="hue-wheel"]');
   const box = await wheel.boundingBox(); assert.ok(box);
@@ -32,11 +48,26 @@ try {
   await page.mouse.up();
   assert.equal(await page.evaluate(() => window.testApp.state.recentColors.length), Math.min(12, before + 1), 'pointer release commits once');
 
+  const cancelStart = await page.evaluate(() => window.testApp.state.color);
+  const recentBeforeCancel = await page.evaluate(() => window.testApp.state.recentColors.slice());
+  await page.mouse.move(box.x + box.width / 2, box.y + 2); await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2);
+  assert.notEqual(await page.evaluate(() => window.testApp.state.color), cancelStart, 'cancel test applies a preview first');
+  await wheel.dispatchEvent('pointercancel', {pointerId:1}); await page.mouse.up();
+  assert.equal(await page.evaluate(() => window.testApp.state.color), cancelStart, 'pointercancel restores the drag-start color');
+  assert.deepEqual(await page.evaluate(() => window.testApp.state.recentColors), recentBeforeCancel, 'pointercancel does not commit to Recent Colors');
+
   const favorite = page.locator('[data-brush-favorite]').first(); await favorite.click();
   await page.locator('[data-brush-filter="favorites"]').click();
   assert.equal(await page.locator('[data-preset]:visible').count(), 1);
-  await page.locator('[data-preset]:visible').click(); await page.locator('[data-brush-filter="recent"]').click();
-  assert.ok(await page.locator('[data-preset]:visible').count() >= 1);
+  const favoriteName=(await page.locator('[data-preset]:visible strong').innerText()).toLowerCase();
+  await page.locator('[data-brush-search]').fill('no matching brush'); assert.equal(await page.locator('[data-preset]:visible').count(),0,'Search + Favorites intersects both conditions');
+  await page.locator('[data-brush-search]').fill(favoriteName); assert.equal(await page.locator('[data-preset]:visible').count(),1,'Search + Favorites preserves matching favorite');
+  await page.locator('[data-brush-search]').fill(''); await page.locator('[data-preset]:visible').click();
+  await page.locator('[data-brush-filter="all"]').click(); const second=page.locator('[data-preset]').nth(1); const recentName=(await second.locator('strong').innerText()).toLowerCase(); await second.click();
+  await page.locator('[data-brush-filter="recent"]').click(); assert.equal(await page.locator('[data-preset]:visible').count(),2);
+  await page.locator('[data-brush-search]').fill(recentName); assert.equal(await page.locator('[data-preset]:visible').count(),1,'Search + Recent preserves matching recent brush');
+  await page.locator('[data-brush-search]').fill('no matching brush'); assert.equal(await page.locator('[data-preset]:visible').count(),0,'Search + Recent intersects both conditions');
   assert.equal(await page.locator('.subtool-footer button').isDisabled(), true, 'unsupported Add Brush is visibly disabled');
 
   await page.locator('[data-control="shortcut-profile"]').selectOption('clip');
