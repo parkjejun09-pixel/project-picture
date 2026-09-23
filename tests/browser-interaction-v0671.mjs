@@ -50,10 +50,12 @@ try {
 
   const cancelStart = await page.evaluate(() => window.testApp.state.color);
   const recentBeforeCancel = await page.evaluate(() => window.testApp.state.recentColors.slice());
+  await wheel.evaluate(element => element.addEventListener('pointerdown', event => { element.dataset.testPointerId=String(event.pointerId); }, {once:true}));
   await page.mouse.move(box.x + box.width / 2, box.y + 2); await page.mouse.down();
   await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2);
   assert.notEqual(await page.evaluate(() => window.testApp.state.color), cancelStart, 'cancel test applies a preview first');
-  await wheel.dispatchEvent('pointercancel', {pointerId:1}); await page.mouse.up();
+  const activePointerId=Number(await wheel.getAttribute('data-test-pointer-id')); assert.ok(Number.isInteger(activePointerId));
+  await wheel.dispatchEvent('pointercancel', {pointerId:activePointerId}); await page.mouse.up();
   assert.equal(await page.evaluate(() => window.testApp.state.color), cancelStart, 'pointercancel restores the drag-start color');
   assert.deepEqual(await page.evaluate(() => window.testApp.state.recentColors), recentBeforeCancel, 'pointercancel does not commit to Recent Colors');
 
@@ -71,6 +73,8 @@ try {
   assert.equal(await page.locator('.subtool-footer button').isDisabled(), true, 'unsupported Add Brush is visibly disabled');
 
   await page.locator('[data-control="shortcut-profile"]').selectOption('clip');
+  await page.locator('.brand-lockup').click();
+  assert.equal(await page.locator('[data-control="shortcut-profile"]').evaluate(element => document.activeElement === element), false, 'shortcut profile select is blurred before global shortcuts');
   await page.keyboard.press('e'); await page.keyboard.press('p');
   assert.equal(await page.locator('.editor-shell').getAttribute('data-tool'), 'brush');
   assert.match(await page.locator('[data-tool="brush"]').getAttribute('title'), /\(P\)$/);
