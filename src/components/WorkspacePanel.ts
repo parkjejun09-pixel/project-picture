@@ -35,7 +35,7 @@ export function workspacePanelMarkup(state: EditorState): string {
       <option value="adobe"${selected(state.shortcutProfile,'adobe')}>Adobe-like</option>
       <option value="clip"${selected(state.shortcutProfile,'clip')}>Clip-like</option>
     </select></label>
-    <small class="setting-help shortcut-help">Core B / E / H / G shortcuts are shared in V0.5; the profile foundation is ready for the expanding tool set.</small>
+    <small class="setting-help shortcut-help">Tool shortcuts and toolbar labels follow the selected profile.</small>
     <button class="workspace-reset-button" data-action="workspace-reset">Reset workspace layout</button>`;
 }
 

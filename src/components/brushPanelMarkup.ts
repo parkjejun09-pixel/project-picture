@@ -12,9 +12,10 @@ export function pressureResponseLabel(value: number): string {
 export function brushPanelMarkup(selectedPreset: BrushPresetId): string {
   const selected = BRUSH_PRESETS.find((preset) => preset.id === selectedPreset) ?? BRUSH_PRESETS[1]!;
   return `
-    <div class="palette-heading"><span>SUB TOOL</span><div class="palette-heading-actions"><button title="Brush menu">☰</button></div></div>
+    <div class="palette-heading"><span>SUB TOOL</span><div class="palette-heading-actions"><button data-brush-menu title="Brush menu" aria-expanded="false">☰</button></div></div>
+    <div class="brush-options-menu" data-brush-options hidden><button data-brush-clear-recent type="button">Clear recent brushes</button></div>
     <div class="subtool-search"><input data-brush-search type="search" placeholder="Search brushes" aria-label="Search brushes"></div>
-    <div class="subtool-filter-row"><button class="active">Brush</button><button>Favorites</button><button>Recent</button></div>
+    <div class="subtool-filter-row"><button class="active" data-brush-filter="all">Brush</button><button data-brush-filter="favorites">Favorites</button><button data-brush-filter="recent">Recent</button></div>
     <div class="brush-preset-grid subtool-list" aria-label="Brush presets">
       ${BRUSH_PRESETS.map((preset) => `
         <button class="brush-preset-card${preset.id === selectedPreset ? ' selected' : ''}" data-preset="${preset.id}" title="${preset.description}">
@@ -23,7 +24,7 @@ export function brushPanelMarkup(selectedPreset: BrushPresetId): string {
           <span class="subtool-size">${preset.size}</span><span class="brush-favorite" data-brush-favorite="${preset.id}">☆</span>
         </button>`).join('')}
     </div>
-    <div class="subtool-footer"><span>${BRUSH_PRESETS.length} brushes</span><button title="Add brush">＋</button></div>
+    <div class="subtool-footer"><span data-brush-count>${BRUSH_PRESETS.length} brushes</span><button title="Add brush is available in Brush Studio import" disabled aria-disabled="true">＋</button></div>
     <div class="advanced-brush-section" data-advanced-only>
       <div class="palette-subheading"><span>BRUSH DYNAMICS</span><small>${pressureResponseLabel(selected.pressureResponse)}</small></div>
       <div class="pressure-curve-card">

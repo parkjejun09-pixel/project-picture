@@ -3,7 +3,8 @@ import { extractPaletteFromPixels } from '../drawing/palette.js';
 import type { EditorState } from '../editor/types.js';
 
 export interface ColorPanelCallbacks {
-  onColorChange: (value: string) => void;
+  onColorPreview: (value: string) => void;
+  onColorCommit: (value: string) => void;
   onToggleFavorite: (value: string) => void;
   onAddProject: (value: string) => void;
   onExtractedColors: (values: string[]) => void;
@@ -128,9 +129,12 @@ export class ColorPanel {
     const hex = this.element.querySelector<HTMLInputElement>('[data-control="hex"]')!;
     const applyHex = (): void => {
       const raw = hex.value.trim();
-      if (/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(raw)) this.callbacks.onColorChange(`#${raw}`);
+      if (/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(raw)) this.callbacks.onColorCommit(`#${raw}`);
     };
-    hex.addEventListener('input', applyHex);
+    hex.addEventListener('input', () => {
+      const raw = hex.value.trim();
+      if (/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(raw)) this.callbacks.onColorPreview(`#${raw}`);
+    });
     hex.addEventListener('blur', applyHex);
 
     this.element.querySelectorAll<HTMLInputElement>('[data-channel]').forEach((input) => input.addEventListener('change', () => {
@@ -139,13 +143,13 @@ export class ColorPanel {
       const name = input.dataset.channel;
       const value = Number(input.value);
       if (name === 'r' || name === 'g' || name === 'b') {
-        this.callbacks.onColorChange(`#${[name === 'r' ? value : rgb.r, name === 'g' ? value : rgb.g, name === 'b' ? value : rgb.b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2,'0')).join('')}`);
+        this.callbacks.onColorCommit(`#${[name === 'r' ? value : rgb.r, name === 'g' ? value : rgb.g, name === 'b' ? value : rgb.b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2,'0')).join('')}`);
       } else if (name) {
         const next = { ...hsv };
         if (name === 'h') next.h = value;
         if (name === 's') next.s = value / 100;
         if (name === 'v') next.v = value / 100;
-        this.callbacks.onColorChange(hsvToHex(next));
+        this.callbacks.onColorCommit(hsvToHex(next));
       }
     }));
 
@@ -155,14 +159,14 @@ export class ColorPanel {
       const dy = event.clientY - (rect.top + rect.height / 2);
       const hue = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
       const hsv = hexToHsv(this.state.color);
-      this.callbacks.onColorChange(hsvToHex({ ...hsv, h: hue }));
+      return hsvToHex({ ...hsv, h: hue });
     });
     this.bindPointerControl('[data-control="sv-square"]', (event, element) => {
       const rect = element.getBoundingClientRect();
       const s = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
       const v = 1 - Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
       const hsv = hexToHsv(this.state.color);
-      this.callbacks.onColorChange(hsvToHex({ h: hsv.h, s, v }));
+      return hsvToHex({ h: hsv.h, s, v });
     });
 
     this.element.querySelector<HTMLSelectElement>('[data-control="harmony-mode"]')!.addEventListener('change', (event) => {
@@ -182,16 +186,20 @@ export class ColorPanel {
     this.element.querySelector<HTMLInputElement>('[data-control="palette-image"]')!.addEventListener('change', (event) => void this.extractImagePalette(event));
     this.element.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-color-value]');
-      if (button?.dataset.colorValue) this.callbacks.onColorChange(button.dataset.colorValue);
+      if (button?.dataset.colorValue) this.callbacks.onColorCommit(button.dataset.colorValue);
     });
   }
 
-  private bindPointerControl(selector: string, callback: (event: PointerEvent, element: HTMLElement) => void): void {
+  private bindPointerControl(selector: string, callback: (event: PointerEvent, element: HTMLElement) => string): void {
     const element = this.element.querySelector<HTMLElement>(selector)!;
-    const handle = (event: PointerEvent): void => { event.preventDefault(); event.stopPropagation(); callback(event, element); };
-    element.addEventListener('pointerdown', (event) => { element.setPointerCapture?.(event.pointerId); handle(event); });
-    element.addEventListener('pointermove', (event) => { if (element.hasPointerCapture?.(event.pointerId)) handle(event); });
-    element.addEventListener('pointerup', (event) => element.releasePointerCapture?.(event.pointerId));
+    let preview = this.state.color;
+    let startColor = this.state.color;
+    let activePointer: number | null = null;
+    const handle = (event: PointerEvent): void => { event.preventDefault(); event.stopPropagation(); preview = callback(event, element); this.callbacks.onColorPreview(preview); };
+    element.addEventListener('pointerdown', (event) => { startColor=this.state.color; activePointer=event.pointerId; element.setPointerCapture?.(event.pointerId); handle(event); });
+    element.addEventListener('pointermove', (event) => { if (activePointer===event.pointerId && element.hasPointerCapture?.(event.pointerId)) handle(event); });
+    element.addEventListener('pointerup', (event) => { if(activePointer!==event.pointerId)return; handle(event); element.releasePointerCapture?.(event.pointerId); activePointer=null; this.callbacks.onColorCommit(preview); });
+    element.addEventListener('pointercancel', (event) => { if(activePointer!==event.pointerId)return; element.releasePointerCapture?.(event.pointerId); activePointer=null; preview=startColor; this.callbacks.onColorPreview(startColor); });
   }
 
   private renderHarmony(): void {

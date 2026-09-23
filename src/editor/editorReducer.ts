@@ -123,7 +123,12 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     }
     case 'workspace/reset':
       return { ...state, ...defaultWorkspacePreferences };
-    case 'color/set': {
+    case 'color/preview': {
+      const color = normalizeHex(action.value);
+      return color ? { ...state, color } : state;
+    }
+    case 'color/set':
+    case 'color/commit': {
       const color = normalizeHex(action.value);
       return color ? { ...state, color, recentColors: addRecentColor(state.recentColors, color) } : state;
     }

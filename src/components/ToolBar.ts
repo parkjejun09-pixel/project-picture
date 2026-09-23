@@ -1,4 +1,5 @@
 import type { Tool } from '../editor/types.js';
+import { shortcutForTool } from '../editor/shortcuts.js';
 
 const icons: Record<Tool, string> = {
   brush: `<svg viewBox="0 0 24 24"><path d="M14.7 4.3 19.7 9.3 9 20H4v-5L14.7 4.3Z"></path><path d="m12.7 6.3 5 5"></path></svg>`,
@@ -29,7 +30,7 @@ const toolRows: Array<{ tool: Tool; label: string; title: string }> = [
   { tool: 'brush', label: 'Brush', title: 'Brush (B)' },
   { tool: 'eraser', label: 'Erase', title: 'Eraser (E)' },
   { tool: 'smudge', label: 'Smudge', title: 'Smudge (S)' },
-  { tool: 'blur', label: 'Blur', title: 'Blur (R)' },
+  { tool: 'blur', label: 'Blur', title: 'Blur' },
   { tool: 'mix', label: 'Mix', title: 'Wet Mix (X)' },
   { tool: 'eyedropper', label: 'Pick', title: 'Eyedropper (I)' },
   { tool: 'pan', label: 'Pan', title: 'Pan (H or Space)' },
@@ -54,7 +55,7 @@ export function createToolBar(onToolChange: (tool: Tool) => void): HTMLElement {
   const toolbar = document.createElement('aside');
   toolbar.className = 'toolbar';
   toolbar.setAttribute('aria-label', 'Drawing tools');
-  toolbar.innerHTML = `${toolRows.map(({ tool, label, title }) => `<button class="tool-button${tool === 'brush' ? ' active' : ''}" data-tool="${tool}" title="${title}"><span class="tool-icon">${icons[tool]}</span><span>${label}</span></button>`).join('')}<div class="tool-spacer"></div><div class="tool-color-stack" title="Foreground / background color"><i class="secondary-color"></i><i class="active-color"></i></div>`;
+  toolbar.innerHTML = `${toolRows.map(({ tool, label, title }) => { const key=shortcutForTool(tool,'studio'); const base=title.replace(/ \([^)]*\)$/,''); return `<button class="tool-button${tool === 'brush' ? ' active' : ''}" data-tool="${tool}" title="${base}${key ? ` (${key})` : ''}"><span class="tool-icon">${icons[tool]}</span><span>${label}</span></button>`; }).join('')}<div class="tool-spacer"></div><div class="tool-color-stack" title="Foreground / background color"><i class="secondary-color"></i><i class="active-color"></i></div>`;
   toolbar.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach((button) => button.addEventListener('click', () => onToolChange(button.dataset.tool as Tool)));
   return toolbar;
 }

@@ -113,6 +113,8 @@ export type EditorAction =
   | { type: 'panel/toggle'; panelId: string }
   | { type: 'workspace/reset' }
   | { type: 'color/set'; value: string }
+  | { type: 'color/preview'; value: string }
+  | { type: 'color/commit'; value: string }
   | { type: 'secondary-color/set'; value: string }
   | { type: 'brush-preset/set'; preset: BrushPresetId }
   | { type: 'brush-size/set'; value: number }

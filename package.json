@@ -8,7 +8,7 @@
     "compile": "tsc -p tsconfig.json",
     "build": "node scripts/build.mjs",
     "test": "node scripts/test.mjs",
-    "test:browser": "npm run build && node tests/browser-text-v067.mjs && node tests/browser-ui-v067.mjs && node tests/browser-v067.mjs",
+    "test:browser": "npm run build && node tests/browser-interaction-v0671.mjs && node tests/browser-text-v067.mjs && node tests/browser-ui-v067.mjs && node tests/browser-v067.mjs",
     "serve": "node scripts/serve.mjs"
   },
   "devDependencies": {

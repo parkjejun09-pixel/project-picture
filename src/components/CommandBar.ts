@@ -1,3 +1,5 @@
+import type { EditorCommandId } from '../editor/commands.js';
+
 export interface CommandBarState {
   brushSize: number;
   opacity: number;
@@ -7,13 +9,7 @@ export interface CommandBarState {
 }
 
 export interface CommandBarCallbacks {
-  onOpenProject: () => void;
-  onSaveProject: () => void;
-  onSaveAsProject: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  onExport: () => void;
-  onResetView: () => void;
+  onCommand: (command: EditorCommandId) => void;
   onSize: (value: number) => void;
   onOpacity: (value: number) => void;
   onStabilizer: (value: number) => void;
@@ -56,13 +52,8 @@ export function createCommandBar(state: CommandBarState, callbacks: CommandBarCa
   bar.className = 'command-bar';
   bar.setAttribute('aria-label', 'Drawing command bar');
   bar.innerHTML = commandBarMarkup(state);
-  bar.querySelector<HTMLButtonElement>('[data-action="open-project"]')?.addEventListener('click', callbacks.onOpenProject);
-  bar.querySelector<HTMLButtonElement>('[data-action="save-project"]')?.addEventListener('click', callbacks.onSaveProject);
-  bar.querySelector<HTMLButtonElement>('[data-action="save-as-project"]')?.addEventListener('click', callbacks.onSaveAsProject);
-  bar.querySelector<HTMLButtonElement>('[data-action="undo"]')?.addEventListener('click', callbacks.onUndo);
-  bar.querySelector<HTMLButtonElement>('[data-action="redo"]')?.addEventListener('click', callbacks.onRedo);
-  bar.querySelector<HTMLButtonElement>('[data-action="export"]')?.addEventListener('click', callbacks.onExport);
-  bar.querySelector<HTMLButtonElement>('[data-action="reset-view"]')?.addEventListener('click', callbacks.onResetView);
+  const commands: Record<string, EditorCommandId> = { 'open-project':'file.open', 'save-project':'file.save', 'save-as-project':'file.saveAs', undo:'edit.undo', redo:'edit.redo', export:'file.exportPng', 'reset-view':'view.fitCanvas' };
+  Object.entries(commands).forEach(([action, command]) => bar.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)?.addEventListener('click', () => callbacks.onCommand(command)));
   bar.querySelector<HTMLButtonElement>('[data-action="snap-toggle"]')?.addEventListener('click', callbacks.onSnapToggle);
   const bind = (name: string, callback: (value: number) => void, scale = 1): void => {
     bar.querySelector<HTMLInputElement>(`[data-command="${name}"]`)?.addEventListener('change', (event) => {
